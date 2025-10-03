@@ -3,6 +3,8 @@ package plc.project.parser;
 import com.google.common.base.Preconditions;
 import plc.project.lexer.Token;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -77,51 +79,271 @@ public final class Parser {
     }
 
     private Ast.Expr parseExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        return parseLogicalExpr();
     }
 
     private Ast.Expr parseLogicalExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        Ast.Expr l = parseComparisonExpr();
+
+        while (tokens.peek("AND") || tokens.peek("OR")) {
+            String o = tokens.get(0).literal();
+
+            tokens.match(o);
+            Ast.Expr r = parseComparisonExpr();
+
+            l = new Ast.Expr.Binary(o, l, r);
+        }
+        return l;
+
     }
 
     private Ast.Expr parseComparisonExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        Ast.Expr l = parseAdditiveExpr();
+
+        while (tokens.peek(">") || tokens.peek("<") || tokens.peek(">=") || tokens.peek("<=") || tokens.peek("==") || tokens.peek("!=")) {
+            String o = tokens.get(0).literal();
+            tokens.match(o);
+
+            Ast.Expr r = parseAdditiveExpr();
+            l = new Ast.Expr.Binary(o, l, r);
+        }
+        return l;
     }
 
     private Ast.Expr parseAdditiveExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        Ast.Expr l = parseMultiplicativeExpr();
+        while (tokens.peek("+") || tokens.peek("-")) {
+            String o = tokens.get(0).literal();
+            tokens.match(o);
+            Ast.Expr r = parseMultiplicativeExpr();
+            l = new Ast.Expr.Binary(o, l, r);
+        }
+        return l;
     }
 
     private Ast.Expr parseMultiplicativeExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        Ast.Expr l = parseSecondaryExpr();
+
+        while (tokens.peek("*") || tokens.peek("/")) {
+            String o = tokens.get(0).literal();
+            tokens.match(o);
+            Ast.Expr r = parseSecondaryExpr();
+            l = new Ast.Expr.Binary(o, l, r);
+        }
+        return l;
     }
 
     private Ast.Expr parseSecondaryExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        Ast.Expr expr = parsePrimaryExpr();
+
+        while (tokens.peek(".")) {
+            expr = parsePropertyOrMethod(expr);
+        }
+
+        return expr;
     }
 
     private Ast.Expr parsePropertyOrMethod(Ast.Expr receiver) throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (!tokens.peek(".")) {
+            throw new ParseException("Missing .", tokens.getNext());
+        }
+        if (!tokens.peek(Token.Type.IDENTIFIER)) {
+            throw new ParseException("Missing identifier.", tokens.getNext());
+        }
+        String name = tokens.get(0).literal();
+
+        tokens.match(Token.Type.IDENTIFIER);
+
+        if (tokens.match("(")) {
+            List<Ast.Expr> a = new ArrayList<>();
+            if (!tokens.peek(")")) {
+                a.add(parseExpr());
+
+                while (tokens.match(",")) {
+                    a.add(parseExpr());
+                }
+            }
+            if (!tokens.peek(")")) {
+                throw new ParseException("Missing }.", tokens.getNext());
+            }
+            return new Ast.Expr.Method(receiver, name, a);
+        }
+        else {
+            return new Ast.Expr.Property(receiver, name);
+        }
     }
 
     private Ast.Expr parsePrimaryExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (tokens.match("NIL")) return new Ast.Expr.Literal("NIL");
+        if (tokens.match("TRUE")) return new Ast.Expr.Literal(Boolean.TRUE);
+        if (tokens.match("FALSE")) return new Ast.Expr.Literal(Boolean.FALSE);
+
+        if (tokens.peek(Token.Type.INTEGER) || tokens.peek(Token.Type.DECIMAL) || tokens.peek(Token.Type.CHARACTER)|| tokens.peek(Token.Type.STRING)) {
+            return parseLiteralExpr();
+        }
+        else if (tokens.peek("(")) {
+            return parseGroupExpr();
+        }
+
+        else if (tokens.peek("OBJECT")) {
+            return parseObjectExpr();
+        }
+
+        else if (tokens.peek(Token.Type.IDENTIFIER)) {
+            return parseVariableOrFunctionExpr();
+        }
+
+        throw new ParseException("Missing primary expression.", tokens.getNext());
     }
 
     private Ast.Expr parseLiteralExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (tokens.match("NIL")) {
+            return new Ast.Expr.Literal(null);
+        }
+        else if (tokens.match("TRUE")) {
+            return new  Ast.Expr.Literal(Boolean.TRUE);
+        }
+        else if (tokens.match("FALSE")) {
+            return new  Ast.Expr.Literal(Boolean.FALSE);
+        }
+
+
+        else if (tokens.peek(Token.Type.INTEGER)) {
+            String l = tokens.get(0).literal();
+
+            try {
+                if (l.contains("e") || l.contains("E")) {
+
+                    //  Hint: Maybe there's a way to utilize BigDecimal?
+                    BigDecimal b = new BigDecimal(l);
+
+                    return new Ast.Expr.Literal(b.toBigIntegerExact());
+                }
+                return new Ast.Expr.Literal(new BigInteger(l));
+            }
+            catch (ArithmeticException  | NumberFormatException err) {
+                throw new ParseException("Invalid integer", tokens.getNext());
+            }
+        }
+        else if (tokens.peek(Token.Type.DECIMAL)) {
+            String l = tokens.get(0).literal();
+            tokens.match(Token.Type.DECIMAL);
+
+            try {
+                return new  Ast.Expr.Literal(new BigDecimal(l));
+            }
+            catch (NumberFormatException err) {
+                throw new ParseException("Invalid decimal", tokens.getNext());
+            }
+        }
+        else if (tokens.peek(Token.Type.CHARACTER)) {
+            String l = tokens.get(0).literal();
+            tokens.match(Token.Type.CHARACTER);
+            String i = l.substring(1, l.length() - 1);
+            Character val;
+
+            if (i.startsWith("\\")) {
+                if (i.length() != 2) {
+                    throw new ParseException("Invalid character", tokens.getNext());
+                }
+                char esc = i.charAt(1);
+                switch (esc) {
+                    case 'b':  val = '\b'; break;
+                    case 'n':  val = '\n'; break;
+                    case 'r':  val = '\r'; break;
+                    case 't':  val = '\t'; break;
+                    case '\'': val = '\''; break;
+                    case '\"': val = '\"'; break;
+                    case '\\': val = '\\'; break;
+                    default: throw new ParseException("Invalid character", tokens.getNext());
+                }
+            }
+            else {
+                throw new ParseException("Invalid character", tokens.getNext());
+            }
+            return new Ast.Expr.Literal(val);
+
+
+        }
+        else if (tokens.peek(Token.Type.STRING)) {
+            String l = tokens.get(0).literal();
+            tokens.match(Token.Type.STRING);
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 1; i < l.length() - 1; i++) {
+                char c = l.charAt(i);
+
+                if (c != '\\') {
+                    sb.append(c);
+                }
+                else {
+                    if (i + 1 >= l.length() - 1) {
+                        throw new ParseException("Invalid string", tokens.getNext());
+                    }
+
+                    char esc = l.charAt(++i);
+                    switch (esc) {
+                        case 'b':  sb.append('\b'); break;
+                        case 'n':  sb.append('\n'); break;
+                        case 'r':  sb.append('\r'); break;
+                        case 't':  sb.append('\t'); break;
+                        case '\'': sb.append('\''); break;
+                        case '\"': sb.append('\"'); break;
+                        case '\\': sb.append('\\'); break;
+                        default: throw new ParseException("Invalid string", tokens.getNext());
+                    }
+                }
+            }
+            return new Ast.Expr.Literal(sb.toString());
+        }
+        throw new ParseException("Expected literal", tokens.getNext());
     }
 
     private Ast.Expr parseGroupExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (!tokens.match("(")) {
+            throw new ParseException("Expected '('", tokens.getNext());
+
+        }
+        Ast.Expr i = parseExpr();
+
+
+        if (!tokens.match(")")) {
+            throw new ParseException("Expected ')'", tokens.getNext());
+        }
+        return new Ast.Expr.Group(i);
     }
 
     private Ast.Expr parseObjectExpr() throws ParseException {
         throw new UnsupportedOperationException("TODO"); //TODO
+        // checkpoint 2
     }
 
     private Ast.Expr parseVariableOrFunctionExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (!tokens.peek(Token.Type.IDENTIFIER)) {
+            throw new ParseException("Missing IDENTIFIER", tokens.getNext());
+        }
+
+        String name = tokens.get(0).literal();
+        tokens.match(Token.Type.IDENTIFIER);
+
+        if (tokens.match("(")) {
+            List<Ast.Expr> a = new ArrayList<>();
+            if (!tokens.peek(")")) {
+                a.add(parseExpr());
+
+                while (tokens.match(",")) {
+                    a.add(parseExpr());
+                }
+            }
+            if (!tokens.match(")")) {
+                throw new ParseException("Missing ')'", tokens.getNext());
+            }
+            return new Ast.Expr.Function(name, a);
+
+        }
+        else {
+            return new Ast.Expr.Variable(name);
+        }
     }
 
     private static final class TokenStream {
