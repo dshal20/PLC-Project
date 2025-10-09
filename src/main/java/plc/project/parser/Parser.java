@@ -51,31 +51,204 @@ public final class Parser {
     }
 
     private Ast.Stmt parseStmt() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (tokens.peek("LET")) {
+            return parseLetStmt();
+        }
+        else if (tokens.peek("DEF")) {
+            return parseDefStmt();
+        }
+        else if (tokens.peek("IF")) {
+            return parseIfStmt();
+        }
+        else if (tokens.peek("FOR")) {
+            return parseForStmt();
+        }
+        else if (tokens.peek("RETURN")) {
+            return parseReturnStmt();
+        }
+        else {
+            return parseExpressionOrAssignmentStmt();
+        }
+
     }
 
     private Ast.Stmt parseLetStmt() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (!tokens.match("LET")) {
+
+            throw new ParseException("invalid LET", tokens.getNext());
+        }
+        if (!tokens.peek(Token.Type.IDENTIFIER)) {
+            throw new ParseException("invalid identifier.", tokens.getNext());
+        }
+
+        String name = tokens.get(0).literal();
+        tokens.match(Token.Type.IDENTIFIER);
+
+        Optional<Ast.Expr> val = Optional.empty();
+
+        if (tokens.match("=")) {
+            val = Optional.of(parseExpr());
+        }
+
+        if (!tokens.match(";")) {
+            throw new ParseException("invalid ;", tokens.getNext());
+        }
+
+        return new Ast.Stmt.Let(name, val);
     }
 
     private Ast.Stmt parseDefStmt() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (!tokens.match("DEF")) {
+
+            throw new ParseException("invalid DEF", tokens.getNext());
+        }
+        if (!tokens.peek(Token.Type.IDENTIFIER)) {
+            throw new ParseException("invalid identifier.", tokens.getNext());
+        }
+
+        String name = tokens.get(0).literal();
+        tokens.match(Token.Type.IDENTIFIER);
+
+        if (!tokens.match("(")) {
+            throw new ParseException("invalid (", tokens.getNext());
+        }
+
+        List<String> parameter = new ArrayList<>();
+
+        if (!tokens.peek(")")) {
+            if (!tokens.peek(Token.Type.IDENTIFIER)) {
+                throw new ParseException("invalid parameter", tokens.getNext());
+            }
+            parameter.add(tokens.get(0).literal());
+            tokens.match(Token.Type.IDENTIFIER);
+
+            while (tokens.match(",")) {
+                if (!tokens.peek(Token.Type.IDENTIFIER)) {
+                    throw new ParseException("invalid parameter", tokens.getNext());
+                }
+                parameter.add(tokens.get(0).literal());
+                tokens.match(Token.Type.IDENTIFIER);
+
+            }
+        }
+        if (!tokens.match(")")) {
+            throw new ParseException("invalid )", tokens.getNext());
+        }
+        if (!tokens.match("DO")) {
+            throw new  ParseException("invalid DO", tokens.getNext());
+        }
+        List<Ast.Stmt> l = new ArrayList<>();
+        while (tokens.has(0) && !tokens.peek("END")) {
+            l.add(parseStmt());
+        }
+        if (!tokens.match("END")) {
+            throw new ParseException("invalid END", tokens.getNext());
+        }
+        return new Ast.Stmt.Def(name, parameter, l);
+
+
     }
 
     private Ast.Stmt parseIfStmt() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (!tokens.match("IF")) {
+            throw new ParseException("invalid IF", tokens.getNext());
+        }
+
+        Ast.Expr cond = parseExpr();
+
+        if (!tokens.match("DO")) {
+            throw new ParseException("invalid DO", tokens.getNext());
+        }
+
+        List<Ast.Stmt> l = new ArrayList<>();
+
+        while (tokens.has(0) && !tokens.peek("ELSE") && !tokens.peek("END")) {
+            l.add(parseStmt());
+        }
+
+        List<Ast.Stmt> l2 = new ArrayList<>();
+        if (tokens.match("ELSE")) {
+            while (tokens.has(0) && !tokens.peek("END")) {
+                l2.add(parseStmt());
+            }
+        }
+
+        if (!tokens.match("END")) {
+            throw new ParseException("invalid END", tokens.getNext());
+        }
+        return new Ast.Stmt.If(cond, l, l2);
+
     }
 
     private Ast.Stmt parseForStmt() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (!tokens.match("FOR")) {
+            throw new ParseException("invalid FOR", tokens.getNext());
+        }
+        if (!tokens.peek(Token.Type.IDENTIFIER)) {
+            throw new ParseException("invalid identifier", tokens.getNext());
+        }
+        String name = tokens.get(0).literal();
+        tokens.match(Token.Type.IDENTIFIER);
+
+        if (!tokens.match("IN")) {
+            throw new ParseException("invalid IN", tokens.getNext());
+        }
+
+        Ast.Expr exp = parseExpr();
+
+        if (!tokens.match("DO")) {
+            throw new ParseException("invalid DO", tokens.getNext());
+        }
+        List<Ast.Stmt> l = new ArrayList<>();
+        while (tokens.has(0) && !tokens.peek("END")) {
+            l.add(parseStmt());
+        }
+        if (!tokens.match("END")) {
+            throw new ParseException("invalid END", tokens.getNext());
+        }
+
+        return new Ast.Stmt.For(name, exp, l);
     }
 
     private Ast.Stmt parseReturnStmt() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        if (!tokens.match("RETURN")) {
+            throw new  ParseException("invalid RETURN", tokens.getNext());
+        }
+        Optional<Ast.Expr> val = Optional.empty();
+
+        if (!tokens.peek("IF") && !tokens.peek(";")) {
+            val = Optional.of(parseExpr());
+        }
+        if (tokens.match("IF")) {
+            Ast.Expr cond = parseExpr();
+            if (!tokens.match(";")) {
+                throw new ParseException("invalid ;", tokens.getNext());
+            }
+            return new Ast.Stmt.If(cond, List.of(new Ast.Stmt.Return(val)), List.of());
+        }
+        if (!tokens.match(";")) {
+            throw new ParseException("invalid ;", tokens.getNext());
+        }
+        return new Ast.Stmt.Return(val);
+
     }
 
     private Ast.Stmt parseExpressionOrAssignmentStmt() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+        Ast.Expr l = parseExpr();
+
+        Ast.Stmt result;
+
+        if (tokens.match("=")) {
+            Ast.Expr r = parseExpr();
+            result = new Ast.Stmt.Assignment(l, r);
+        }
+        else {
+            result = new Ast.Stmt.Expression(l);
+        }
+        if (!tokens.match(";")) {
+            throw new ParseException("invalid ;", tokens.getNext());
+        }
+        return result;
     }
 
     private Ast.Expr parseExpr() throws ParseException {
@@ -144,7 +317,7 @@ public final class Parser {
     }
 
     private Ast.Expr parsePropertyOrMethod(Ast.Expr receiver) throws ParseException {
-        if (!tokens.peek(".")) {
+        if (!tokens.match(".")) {
             throw new ParseException("Missing .", tokens.getNext());
         }
         if (!tokens.peek(Token.Type.IDENTIFIER)) {
@@ -163,8 +336,8 @@ public final class Parser {
                     a.add(parseExpr());
                 }
             }
-            if (!tokens.peek(")")) {
-                throw new ParseException("Missing }.", tokens.getNext());
+            if (!tokens.match(")")) {
+                throw new ParseException("Missing ).", tokens.getNext());
             }
             return new Ast.Expr.Method(receiver, name, a);
         }
@@ -174,7 +347,7 @@ public final class Parser {
     }
 
     private Ast.Expr parsePrimaryExpr() throws ParseException {
-        if (tokens.match("NIL")) return new Ast.Expr.Literal("NIL");
+        if (tokens.match("NIL")) return new Ast.Expr.Literal(null);
         if (tokens.match("TRUE")) return new Ast.Expr.Literal(Boolean.TRUE);
         if (tokens.match("FALSE")) return new Ast.Expr.Literal(Boolean.FALSE);
 
@@ -210,7 +383,7 @@ public final class Parser {
 
         else if (tokens.peek(Token.Type.INTEGER)) {
             String l = tokens.get(0).literal();
-
+            tokens.match(Token.Type.INTEGER);
             try {
                 if (l.contains("e") || l.contains("E")) {
 
@@ -259,7 +432,8 @@ public final class Parser {
                 }
             }
             else {
-                throw new ParseException("Invalid character", tokens.getNext());
+                if (i.length() != 1) throw new ParseException("Invalid character", tokens.getNext());
+                val = i.charAt(0);
             }
             return new Ast.Expr.Literal(val);
 
@@ -314,8 +488,43 @@ public final class Parser {
     }
 
     private Ast.Expr parseObjectExpr() throws ParseException {
-        throw new UnsupportedOperationException("TODO"); //TODO
+
         // checkpoint 2
+        if (!tokens.match("OBJECT")) {
+            throw new ParseException("invalid OBJECT", tokens.getNext());
+        }
+
+        Optional<String> name = Optional.empty();
+
+        if (tokens.peek(Token.Type.IDENTIFIER) && !tokens.peek("DO")) {
+
+
+            name = Optional.of(tokens.get(0).literal());
+            tokens.match(Token.Type.IDENTIFIER);
+        }
+
+        if (!tokens.match("DO")) {
+            throw new ParseException("invalid DO", tokens.getNext());
+        }
+
+        List<Ast.Stmt.Let> field = new ArrayList<>();
+
+        List<Ast.Stmt.Def> method = new ArrayList<>();
+        while (tokens.peek("LET")) {
+            Ast.Stmt l = parseLetStmt();
+            field.add((Ast.Stmt.Let) l);
+        }
+
+        while (tokens.peek("DEF")) {
+            Ast.Stmt d = parseDefStmt();
+            method.add((Ast.Stmt.Def) d);
+        }
+
+        if (!tokens.match("END")) {
+            throw new ParseException("invalid END", tokens.getNext());
+        }
+        return new Ast.Expr.ObjectExpr(name, field, method);
+
     }
 
     private Ast.Expr parseVariableOrFunctionExpr() throws ParseException {

@@ -42,7 +42,7 @@ public final class Lexer {
     }
 
     private void lexComment() {
-        while (chars.has(0) && !chars.peek("\n")) {
+        while (chars.has(0) && !chars.peek("\n") && !chars.peek("\r")) {
             chars.match(".");
         }
         chars.emit();
@@ -88,7 +88,7 @@ public final class Lexer {
                 return new Token(Token.Type.INTEGER, i);
             }
         }
-        if (chars.match("[eE]")) {
+        if (chars.match("e")) {
             chars.match("[+-]");
             if (!chars.peek("[0-9]")) {
                 chars.index--;
