@@ -1,11 +1,18 @@
 package plc.project;
 
+import plc.project.evaluator.Environment;
+import plc.project.evaluator.EvaluateException;
+import plc.project.evaluator.Evaluator;
+import plc.project.evaluator.RuntimeValue;
+import plc.project.evaluator.Scope;
 import plc.project.lexer.LexException;
 import plc.project.lexer.Lexer;
 import plc.project.parser.ParseException;
 import plc.project.parser.Parser;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Scanner;
 import java.util.function.Function;
 import java.util.regex.MatchResult;
@@ -19,17 +26,17 @@ import java.util.stream.Collectors;
 public final class Main {
 
     private interface Repl {
-        void evaluate(String input) throws LexException, ParseException;
+        void evaluate(String input) throws LexException, ParseException, EvaluateException;
     }
 
-    private static final Repl REPL = Main::parser; //edit for manual testing
+    private static final Repl REPL = Main::evaluator; //edit for manual testing
 
     public static void main(String[] args) {
         while (true) {
             var input = readInput();
             try {
                 REPL.evaluate(input);
-            } catch (LexException | ParseException e) {
+            } catch (LexException | ParseException | EvaluateException e) {
                 System.out.println(e.getClass().getSimpleName() + ": " + e.getMessage());
             } catch (RuntimeException e) {
                 e.printStackTrace(System.err);
@@ -51,6 +58,21 @@ public final class Main {
         System.out.println(prettify(ast.toString()));
     }
 
+    private static final Evaluator EVALUATOR = new Evaluator(new Scope(Environment.scope()));
+
+    static {
+        EVALUATOR.getScope().define("scope", new RuntimeValue.Function("scope", _ -> {
+            return new RuntimeValue.Primitive(EVALUATOR.getScope()); //returns *current* scope
+        }));
+    }
+
+    private static void evaluator(String input) throws LexException, ParseException, EvaluateException {
+        var tokens = new Lexer(input).lex();
+        var ast = new Parser(tokens).parse("source"); //edit for manual testing
+        var value = EVALUATOR.visit(ast);
+        System.out.println(prettify(value.toString()));
+    }
+
     private static final Scanner SCANNER = new Scanner(System.in);
 
     private static String readInput() {
@@ -69,9 +91,9 @@ public final class Main {
     }
 
     private static final Pattern RECORD_FORMAT = Pattern.compile(
-            "(?<open>)(?<=^|\\[|, |=)[A-Za-z]*\\[(?<inline>(?=[^\\[]*?]))?" +
-                    "|(?<value>), (?=[A-Za-z]+(\\[|=))" +
-                    "|(?<close>)](?=,|]|$)"
+        "(?<open>)(?<=^|\\[|, |=)[A-Za-z]*\\[(?<inline>(?=[^\\[]*?]))?" +
+            "|(?<value>), (?=[A-Za-z]+(\\[|=))" +
+            "|(?<close>)](?=,|]|$)"
     );
 
     private static String prettify(String record) {

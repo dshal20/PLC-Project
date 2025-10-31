@@ -1,8 +1,9 @@
 package plc.project.parser;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * IMPORTANT: This is an API file and should not be modified by your submission.
@@ -10,56 +11,45 @@ import java.util.stream.Stream;
 public sealed interface Ast {
 
     record Source(
-            List<Stmt> statements
+        List<Stmt> statements
     ) implements Ast {}
 
     sealed interface Stmt extends Ast {
 
         record Let(
-                String name,
-                Optional<String> type,
-                Optional<Expr> value
-        ) implements Stmt {
-            public Let(String name, Optional<Expr> value) {
-                this(name, Optional.empty(), value);
-            }
-        }
+            String name,
+            Optional<Expr> value
+        ) implements Stmt {}
 
         record Def(
-                String name,
-                List<String> parameters,
-                List<Optional<String>> parameterTypes, //a Parameter class is better, but not compatible with existing uses.
-                Optional<String> returnType,
-                List<Stmt> body
-        ) implements Stmt {
-            public Def(String name, List<String> parameters, List<Stmt> body) {
-                this(name, parameters, Stream.generate(Optional::<String>empty).limit(parameters.size()).toList(), Optional.empty(), body);
-            }
-        }
+            String name,
+            List<String> parameters,
+            List<Stmt> body
+        ) implements Stmt {}
 
         record If(
-                Expr condition,
-                List<Stmt> thenBody,
-                List<Stmt> elseBody
+            Expr condition,
+            List<Stmt> thenBody,
+            List<Stmt> elseBody
         ) implements Stmt {}
 
         record For(
-                String name,
-                Expr expression,
-                List<Stmt> body
+            String name,
+            Expr expression,
+            List<Stmt> body
         ) implements Stmt {}
 
         record Return(
-                Optional<Expr> value
+            Optional<Expr> value
         ) implements Stmt {}
 
         record Expression(
-                Expr expression
+            Expr expression
         ) implements Stmt {}
 
         record Assignment(
-                Expr expression,
-                Expr value
+            Expr expression,
+            Expr value
         ) implements Stmt {}
 
     }
@@ -67,7 +57,7 @@ public sealed interface Ast {
     sealed interface Expr extends Ast {
 
         record Literal(
-                Object value
+            @Nullable Object value
         ) implements Expr {
             @Override
             public String toString() {
@@ -77,40 +67,40 @@ public sealed interface Ast {
         }
 
         record Group(
-                Expr expression
+            Expr expression
         ) implements Expr {}
 
         record Binary(
-                String operator,
-                Expr left,
-                Expr right
+            String operator,
+            Expr left,
+            Expr right
         ) implements Expr {}
 
         record Variable(
-                String name
+            String name
         ) implements Expr {}
 
         record Property(
-                Expr receiver,
-                String name
+            Expr receiver,
+            String name
         ) implements Expr {}
 
         record Function(
-                String name,
-                List<Expr> arguments
+            String name,
+            List<Expr> arguments
         ) implements Expr {}
 
         record Method(
-                Expr receiver,
-                String name,
-                List<Expr> arguments
+            Expr receiver,
+            String name,
+            List<Expr> arguments
         ) implements Expr {}
 
         //Using "ObjectExpr" to avoid confusion with Java's "Object"
         record ObjectExpr(
-                Optional<String> name,
-                List<Stmt.Let> fields,
-                List<Stmt.Def> methods
+            Optional<String> name,
+            List<Stmt.Let> fields,
+            List<Stmt.Def> methods
         ) implements Expr {}
 
     }
