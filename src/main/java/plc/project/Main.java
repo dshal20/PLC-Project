@@ -1,5 +1,8 @@
 package plc.project;
 
+import plc.project.analyzer.AnalyzeException;
+import plc.project.analyzer.Analyzer;
+import plc.project.analyzer.Type;
 import plc.project.evaluator.Environment;
 import plc.project.evaluator.EvaluateException;
 import plc.project.evaluator.Evaluator;
@@ -26,17 +29,17 @@ import java.util.stream.Collectors;
 public final class Main {
 
     private interface Repl {
-        void evaluate(String input) throws LexException, ParseException, EvaluateException;
+        void evaluate(String input) throws LexException, ParseException, EvaluateException, AnalyzeException;
     }
 
-    private static final Repl REPL = Main::evaluator; //edit for manual testing
+    private static final Repl REPL = Main::analyzer; //edit for manual testing
 
     public static void main(String[] args) {
         while (true) {
             var input = readInput();
             try {
                 REPL.evaluate(input);
-            } catch (LexException | ParseException | EvaluateException e) {
+            } catch (LexException | ParseException | EvaluateException | AnalyzeException e) {
                 System.out.println(e.getClass().getSimpleName() + ": " + e.getMessage());
             } catch (RuntimeException e) {
                 e.printStackTrace(System.err);
@@ -58,10 +61,12 @@ public final class Main {
         System.out.println(prettify(ast.toString()));
     }
 
-    private static final Evaluator EVALUATOR = new Evaluator(new Scope(Environment.scope()));
+    private static final Evaluator EVALUATOR;
 
     static {
-        EVALUATOR.getScope().define("scope", new RuntimeValue.Function("scope", _ -> {
+        var scope = plc.project.evaluator.Environment.scope();
+        EVALUATOR = new Evaluator(new plc.project.evaluator.Scope(scope));
+        scope.define("scope", new RuntimeValue.Function("dynamic_scope", _ -> {
             return new RuntimeValue.Primitive(EVALUATOR.getScope()); //returns *current* scope
         }));
     }
@@ -69,6 +74,23 @@ public final class Main {
     private static void evaluator(String input) throws LexException, ParseException, EvaluateException {
         var tokens = new Lexer(input).lex();
         var ast = new Parser(tokens).parse("source"); //edit for manual testing
+        var value = EVALUATOR.visit(ast);
+        System.out.println(prettify(value.toString()));
+    }
+
+    private static final Analyzer ANALYZER;
+
+    static {
+        var scope = plc.project.analyzer.Environment.scope();
+        ANALYZER = new Analyzer(new plc.project.analyzer.Scope(scope));
+        scope.define("scope", new Type.Function(List.of(), Type.DYNAMIC));
+    }
+
+    private static void analyzer(String input) throws LexException, ParseException, EvaluateException, AnalyzeException {
+        var tokens = new Lexer(input).lex();
+        var ast = new Parser(tokens).parse("source"); //edit for manual testing
+        var ir = ANALYZER.visit(ast);
+        System.out.println(prettify(ir.toString()));
         var value = EVALUATOR.visit(ast);
         System.out.println(prettify(value.toString()));
     }

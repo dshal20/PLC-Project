@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * IMPORTANT: This is an API file and should not be modified by your submission.
@@ -18,14 +19,25 @@ public sealed interface Ast {
 
         record Let(
             String name,
+            Optional<String> type,
             Optional<Expr> value
-        ) implements Stmt {}
+        ) implements Stmt {
+            public Let(String name, Optional<Expr> value) {
+                this(name, Optional.empty(), value);
+            }
+        }
 
         record Def(
             String name,
             List<String> parameters,
+            List<Optional<String>> parameterTypes, //a Parameter class is better, but not compatible with existing uses.
+            Optional<String> returnType,
             List<Stmt> body
-        ) implements Stmt {}
+        ) implements Stmt {
+            public Def(String name, List<String> parameters, List<Stmt> body) {
+                this(name, parameters, Stream.generate(Optional::<String>empty).limit(parameters.size()).toList(), Optional.empty(), body);
+            }
+        }
 
         record If(
             Expr condition,

@@ -58,6 +58,14 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
 
     @Override
     public RuntimeValue visit(Ast.Stmt.Def ast) throws EvaluateException {
+
+        var s = new java.util.HashSet<String>();
+        for (var p : ast.parameters()) {
+            if (!s.add(p)) {
+                throw new EvaluateException("Invalid duplicate " + p, Optional.of(ast));
+            }
+        }
+
         final Scope ogScope = this.scope;
 
 
@@ -352,7 +360,7 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
 
                             .orElseThrow(() -> new EvaluateException("Invalid right", Optional.of(ast.right())));
                     if (rightint.equals(BigInteger.ZERO)) {
-                        throw new EvaluateException("zero division error", Optional.of(ast));
+                        throw new EvaluateException("zero division error", Optional.of(ast.right()));
                     }
                     return new RuntimeValue.Primitive(leftint.get().divide(rightint));
                 } else {
@@ -362,7 +370,7 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
 
                     if (rightdecimal.compareTo(BigDecimal.ZERO) == 0) {
 
-                        throw new EvaluateException("zero division error", Optional.of(ast));
+                        throw new EvaluateException("zero division error", Optional.of(ast.right()));
                     }
 
                     //
@@ -540,13 +548,15 @@ public final class Evaluator implements Ast.Visitor<RuntimeValue, EvaluateExcept
 
     @Override
     public RuntimeValue visit(Ast.Expr.ObjectExpr ast) throws EvaluateException {
-        var o = new RuntimeValue.ObjectValue(ast.name(), new Scope(null));
+        var o = new RuntimeValue.ObjectValue(ast.name(), new Scope(this.scope));
 
         // save scope
         Scope ogscope = this.scope;
 
         try {
             this.scope = o.scope();
+
+            this.scope.define("this", o);
 
             // LET
             for (var i : ast.fields()) {
