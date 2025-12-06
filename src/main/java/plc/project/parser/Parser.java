@@ -84,7 +84,16 @@ public final class Parser {
         String name = tokens.get(0).literal();
         tokens.match(Token.Type.IDENTIFIER);
 
+        Optional<String> type = Optional.empty();
         Optional<Ast.Expr> val = Optional.empty();
+
+        if (tokens.match(":")) {
+            if (!tokens.peek(Token.Type.IDENTIFIER)) {
+                throw new ParseException("invalid type", tokens.getNext());
+            }
+            type = Optional.of(tokens.get(0).literal());
+            tokens.match(Token.Type.IDENTIFIER);
+        }
 
         if (tokens.match("=")) {
             val = Optional.of(parseExpr());
@@ -94,7 +103,7 @@ public final class Parser {
             throw new ParseException("invalid ;", tokens.getNext());
         }
 
-        return new Ast.Stmt.Let(name, val);
+        return new Ast.Stmt.Let(name, type, val);
     }
 
     private Ast.Stmt parseDefStmt() throws ParseException {
@@ -114,26 +123,60 @@ public final class Parser {
         }
 
         List<String> parameter = new ArrayList<>();
+        List<Optional<String>> parameterTypes = new ArrayList<>();
 
         if (!tokens.peek(")")) {
             if (!tokens.peek(Token.Type.IDENTIFIER)) {
                 throw new ParseException("invalid parameter", tokens.getNext());
             }
-            parameter.add(tokens.get(0).literal());
+            String paramName = tokens.get(0).literal();
             tokens.match(Token.Type.IDENTIFIER);
+            
+            Optional<String> paramType = Optional.empty();
+            if (tokens.match(":")) {
+                if (!tokens.peek(Token.Type.IDENTIFIER)) {
+                    throw new ParseException("invalid parameter type", tokens.getNext());
+                }
+                paramType = Optional.of(tokens.get(0).literal());
+                tokens.match(Token.Type.IDENTIFIER);
+            }
+            
+            parameter.add(paramName);
+            parameterTypes.add(paramType);
 
             while (tokens.match(",")) {
                 if (!tokens.peek(Token.Type.IDENTIFIER)) {
                     throw new ParseException("invalid parameter", tokens.getNext());
                 }
-                parameter.add(tokens.get(0).literal());
+                paramName = tokens.get(0).literal();
                 tokens.match(Token.Type.IDENTIFIER);
-
+                
+                paramType = Optional.empty();
+                if (tokens.match(":")) {
+                    if (!tokens.peek(Token.Type.IDENTIFIER)) {
+                        throw new ParseException("invalid parameter type", tokens.getNext());
+                    }
+                    paramType = Optional.of(tokens.get(0).literal());
+                    tokens.match(Token.Type.IDENTIFIER);
+                }
+                
+                parameter.add(paramName);
+                parameterTypes.add(paramType);
             }
         }
         if (!tokens.match(")")) {
             throw new ParseException("invalid )", tokens.getNext());
         }
+        
+        Optional<String> returnType = Optional.empty();
+        if (tokens.match(":")) {
+            if (!tokens.peek(Token.Type.IDENTIFIER)) {
+                throw new ParseException("invalid return type", tokens.getNext());
+            }
+            returnType = Optional.of(tokens.get(0).literal());
+            tokens.match(Token.Type.IDENTIFIER);
+        }
+        
         if (!tokens.match("DO")) {
             throw new  ParseException("invalid DO", tokens.getNext());
         }
@@ -144,7 +187,7 @@ public final class Parser {
         if (!tokens.match("END")) {
             throw new ParseException("invalid END", tokens.getNext());
         }
-        return new Ast.Stmt.Def(name, parameter, l);
+        return new Ast.Stmt.Def(name, parameter, parameterTypes, returnType, l);
 
 
     }

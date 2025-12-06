@@ -127,4 +127,48 @@ public sealed interface Ir {
 
     }
 
+    interface Visitor<T, E extends Exception> {
+
+        default T visit(Ir ir) throws E {
+            return switch (ir) {
+                case Source source -> visit(source);
+                case Stmt.Let stmt -> visit(stmt);
+                case Stmt.Def stmt -> visit(stmt);
+                case Stmt.If stmt -> visit(stmt);
+                case Stmt.For stmt -> visit(stmt);
+                case Stmt.Return stmt -> visit(stmt);
+                case Stmt.Expression stmt -> visit(stmt);
+                case Stmt.Assignment.Variable stmt -> visit(stmt);
+                case Stmt.Assignment.Property stmt -> visit(stmt);
+                case Expr.Literal expr -> visit(expr);
+                case Expr.Group expr -> visit(expr);
+                case Expr.Binary expr -> visit(expr);
+                case Expr.Variable expr -> visit(expr);
+                case Expr.Property expr -> visit(expr);
+                case Expr.Function expr -> visit(expr);
+                case Expr.Method expr -> visit(expr);
+                case Expr.ObjectExpr expr -> visit(expr);
+            };
+        }
+
+        T visit(Source ir) throws E;
+        T visit(Stmt.Let ir) throws E;
+        T visit(Stmt.Def ir) throws E;
+        T visit(Stmt.If ir) throws E;
+        T visit(Stmt.For ir) throws E;
+        T visit(Stmt.Return ir) throws E;
+        T visit(Stmt.Expression ir) throws E;
+        T visit(Stmt.Assignment.Variable ir) throws E;
+        T visit(Stmt.Assignment.Property ir) throws E;
+        T visit(Expr.Literal ir) throws E;
+        T visit(Expr.Group ir) throws E;
+        T visit(Expr.Binary ir) throws E;
+        T visit(Expr.Variable ir) throws E;
+        T visit(Expr.Property ir) throws E;
+        T visit(Expr.Function ir) throws E;
+        T visit(Expr.Method ir) throws E;
+        T visit(Expr.ObjectExpr ir) throws E;
+
+    }
+
 }

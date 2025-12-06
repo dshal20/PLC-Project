@@ -8,22 +8,23 @@ import java.util.Optional;
  */
 public sealed interface Type {
 
-    Primitive ANY = new Primitive("Any");
-    Primitive NIL = new Primitive("Nil");
-    Primitive DYNAMIC = new Primitive("Dynamic");
+    Primitive ANY = new Primitive("Any", "Object");
+    Primitive NIL = new Primitive("Nil", "Void");
+    Primitive DYNAMIC = new Primitive("Dynamic", "Object"); //Limitation
 
-    Primitive BOOLEAN = new Primitive("Boolean");
-    Primitive INTEGER = new Primitive("Integer");
-    Primitive DECIMAL = new Primitive("Decimal");
-    Primitive CHARACTER = new Primitive("Character");
-    Primitive STRING = new Primitive("String");
+    Primitive BOOLEAN = new Primitive("Boolean", "boolean");
+    Primitive INTEGER = new Primitive("Integer", "BigInteger");
+    Primitive DECIMAL = new Primitive("Decimal", "BigDecimal");
+    Primitive CHARACTER = new Primitive("Character", "char");
+    Primitive STRING = new Primitive("String", "String");
 
-    Primitive EQUATABLE = new Primitive("Equatable");
-    Primitive COMPARABLE = new Primitive("Comparable");
-    Primitive ITERABLE = new Primitive("Iterable");
+    Primitive EQUATABLE = new Primitive("Equatable", "Object");
+    Primitive COMPARABLE = new Primitive("Comparable", "Comparable");
+    Primitive ITERABLE = new Primitive("Iterable", "Iterable<BigInteger>");
 
     record Primitive(
-        String name
+        String name,
+        String jvmName
     ) implements Type {}
 
     record Function(
@@ -54,6 +55,19 @@ public sealed interface Type {
 
     default boolean isSubtypeOf(Type supertype) {
         return Environment.isSubtypeOf(this, supertype);
+    }
+
+    default String jvmName() {
+        return switch (this) {
+            case Primitive primitive -> primitive.jvmName;
+            case Function function -> switch (function.parameters.size()) {
+                case 0 -> "Supplier<" + function.returns.jvmName() + ">";
+                case 1 -> "Function<" + function.parameters.getFirst() + ", " + function.returns.jvmName() + ">";
+                case 2 -> "BiFunction<" + function.parameters.getFirst() + ", " + function.parameters.getLast() + ", " + function.returns.jvmName() + ">";
+                default -> "Object"; //Limitation
+            };
+            case Object _ -> "var";
+        };
     }
 
 }

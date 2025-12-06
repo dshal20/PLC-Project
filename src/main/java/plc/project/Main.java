@@ -8,6 +8,7 @@ import plc.project.evaluator.EvaluateException;
 import plc.project.evaluator.Evaluator;
 import plc.project.evaluator.RuntimeValue;
 import plc.project.evaluator.Scope;
+import plc.project.generator.Generator;
 import plc.project.lexer.LexException;
 import plc.project.lexer.Lexer;
 import plc.project.parser.ParseException;
@@ -32,7 +33,7 @@ public final class Main {
         void evaluate(String input) throws LexException, ParseException, EvaluateException, AnalyzeException;
     }
 
-    private static final Repl REPL = Main::analyzer; //edit for manual testing
+    private static final Repl REPL = Main::generator; //edit for manual testing
 
     public static void main(String[] args) {
         while (true) {
@@ -86,13 +87,21 @@ public final class Main {
         scope.define("scope", new Type.Function(List.of(), Type.DYNAMIC));
     }
 
-    private static void analyzer(String input) throws LexException, ParseException, EvaluateException, AnalyzeException {
+    private static void analyzer(String input) throws LexException, ParseException, AnalyzeException, EvaluateException {
         var tokens = new Lexer(input).lex();
         var ast = new Parser(tokens).parse("source"); //edit for manual testing
         var ir = ANALYZER.visit(ast);
         System.out.println(prettify(ir.toString()));
         var value = EVALUATOR.visit(ast);
         System.out.println(prettify(value.toString()));
+    }
+
+    private static void generator(String input) throws LexException, ParseException, AnalyzeException {
+        var tokens = new Lexer(input).lex();
+        var ast = new Parser(tokens).parse("stmt"); //edit for manual testing
+        var ir = ANALYZER.visit(ast);
+        var code = new Generator().visit(ir);
+        System.out.println(code);
     }
 
     private static final Scanner SCANNER = new Scanner(System.in);
